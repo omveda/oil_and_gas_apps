@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>MapD</title>
+    <meta charset="UTF-8">
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <link href='https://fonts.googleapis.com/css?family=Roboto:400,700,300' rel='stylesheet' type='text/css'>
+    <style>
+        .title {
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .mapd {
+            position: relative;
+            top: 2px;
+        }
+        
+        .search {
+            display: inline-block;
+            margin-top: 12px;
+            margin-left: 50px;
+        }
+        
+        .data-count {
+            padding-right: 20px;
+        }
+        
+        .data-count2 {
+            padding-right: 20px;
+        }
+        
+        .filter-count {
+            font-weight: bold;
+            color: #45B1E8;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-default">
+        <div class="container-fluid">
+            <div class="navbar-header" style="margin-top:10px">
+                <img alt="Brand" src="images/favicon.png" height="30" width="30">
+                <span class="mapd">MapD Demo</span>
+            </div>
+            <div class="navbar-text navbar-right">
+                <div class="data-count1">
+                    <span class="total"><span><span class="filter-count"></span></span>
+                    <span>of <span class="total-count"></span> Natural Gas Points</span>
+                </div>
+                <div class="data-count2">
+                    <span class="total"><span><span class="filter-count"></span></span>
+                    <span>of <span class="total-count"></span> Gas Pipelines</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <div class="col-xs-12">
+            <div class="title">Gas Production Locations and Pipelines in US</div>
+            <div id="gas-production-example"></div>
+        </div>
+
+        <div class="col-xs-6">
+            <div class="title">Natural Gas Flows by Date</div>
+            <div class="time-chart"></div>
+        </div>
+
+        <div class="col-xs-6">
+            <div class="title">Gas Flows by Region</div>
+            <div class="bar-chart"></div>
+        </div>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.4/lodash.min.js"></script>
+    <script src="https://code.jquery.com/jquery-2.2.4.min.js" integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44=" crossorigin="anonymous"></script>
+    <script src="assets/app.bundle.js"></script>
+    <script>
+        /*
+         * This is an example code that shows how to make a multi-layered pointmap & linemap
+         * alongwith a bar chart and time chart using the Natural Gas production and US Pipeline
+         * datasets.
+             vs_gas_production_us_2018 - Table with US Natural Gas production information
+             vs_NaturalGas_Pipelines_US_201804 - US Natural Gas Pipeline information
+         */
+
+        document.addEventListener("DOMContentLoaded", function init() {
+            const config = {
+                table: "vs_NaturalGas_Pipelines_US_201804",
+                geoMeasure: "omnisci_geo",
+                colorMeasure: "TYPEPIPE"
+            }
+
+            // A MapdCon instance is used for performing raw queries on a MapD GPU database.
+            new MapdCon()
+                .protocol("https")
+                .host("use2-api.mapd.cloud") // Connect to OmniSci Cloud Host
+                .port("443")
+                .dbName("mapd") // Default database
+                .user("F0A7674FB728C4DE89A0") // Enter from SETTINGS on cloud portal
+                .password("fiNNiSG6YFZYac7Y9qLROCbbFRSif7L12BWfErSn")
+                .connect(function(error, con) {
+                    // Table for the first layer which is a pointmap.
+                    var tableName1 = 'vs_gas_production_us_2018';
+                    // Table for the second layer which is a linemap.
+                    var tableName2 = 'vs_NaturalGas_Pipelines_US_201804';
+                    // Make 2 crossfilters for the 2 layers.
+                    // A CrossFilter instance is used for generating the raw query strings for MapdCon.
+                    // First Layer
+                    var crossFilter = crossfilter.crossfilter(con, tableName1).then(function(cf1) {
+                        // Second Layer
+                        var crossFilter = crossfilter.crossfilter(con, tableName2).then(function(cf2) {
+                            createCharts(cf1, cf2, con)
+                        });
+                    });
+                });
+
+            // function to create the backend-rendered map.
+            function createCharts(pointcfLayer1, linecfLayer2, con) {
+                var w = document.documentElement.clientWidth - 30;
+                var h = Math.max(document.documentElement.clientHeight, window.innerHeight || 0) - 200;
+                var mapboxToken = "pk.eyJ1IjoibWFwZCIsImEiOiJjaWV1a3NqanYwajVsbmdtMDZzc2pneDVpIn0.cJnk8c2AxdNiRNZWtx5A9g";
+
+                /*---------------------BASIC COUNT ON CROSSFILTER--------------------------*/
+                /*
+                 *  Adding a basic count of the point layers using crossfilter.
+                 *  Note that for the count we use crossFilter itself as the dimension.
+                 */
+                var countGroup1 = pointcfLayer1.groupAll();
+                var dataCount1 = dc.countWidget(".data-count1")
+                    .dimension(pointcfLayer1)
+                    .group(countGroup1);
+
+                var countGroup2 = linecfLayer2.groupAll();
+                var dataCount2 = dc.countWidget(".data-count2")
+                    .dimension(linecfLayer2)
+                    .group(countGroup2);
+
+                /*----------------BUILD THE POINTMAP---------------------
+                  The Pointmap is rendered using the Longitude and Latitude columns from the 
+                  gas production table where the size of the point is based on the flow_value
+                  and the points are colored based on the FlowDirection (Delivery, Receipti, etc.)
+                  Also, specify some items of interest like DisplayName, Region, County etc as 
+                  popup values. 
+                 */
+                var pointMapDim2 = pointcfLayer1.dimension(null).projectOn(["conv_4326_900913_x(Longitude) as x", "conv_4326_900913_y(Latitude) as y", "FlowDirection as color", "flow_value as size"]);
+
+                // we need separate dimensions for the x and y coordinates for point layers.
+                // A filter is applied to these dimensions under the hood so that we only
+                // render points that are within the view.
+                var xDim2 = pointcfLayer1.dimension("Longitude");
+                var yDim2 = pointcfLayer1.dimension("Latitude");
+
+                var sizeScaleLayer2 = d3.scale.linear().domain([0, 5000]).range([1, 5]);
+
+                const colorRange = ["#27aeef", "#ea5545", "#87bc45", "#b33dc6", "#f46a9b", "#ede15b", "#bdcf32", "#ef9b20", "#4db6ac", "#edbf33", "#7c4dff"]
+                const colorDomain = [
+                    "Delivery",
+                    "Receipt",
+                    "Throughput",
+                    "Bidirectional",
+                    "Unknown",
+                    "Mainline",
+                    "Storage",
+                    "TD1",
+                    "TD2",
+                    "Withdrawal",
+                    "Other"
+                ]
+
+                var layer2ColorScale = d3.scale.ordinal().domain(colorDomain).range(colorRange);
+
+                var pointLayer1 = dc
+                    .rasterLayer("points")
+                    .crossfilter(pointcfLayer1)
+                    .setState({
+                        transform: {
+                            sample: true,
+                            limit: 500000
+                        },
+                        mark: "point",
+                        encoding: {
+                            x: {
+                                type: "quantitative",
+                                field: "conv_4326_900913_x(Longitude)"
+                            },
+                            y: {
+                                type: "quantitative",
+                                field: "conv_4326_900913_y(Latitude)"
+                            },
+                            size: {
+                                type: "quantitative",
+                                field: "flow_value",
+                                domain: [0, 2000000],
+                                //domain: [0, 5000],
+                                range: [15, 20]
+                            },
+                            color: {
+                                type: "ordinal",
+                                field: "FlowDirection",
+                                domain: colorDomain,
+                                range: colorRange
+                            }
+                        },
+                        config: {
+                            point: {
+                                shape: "circle"
+                            }
+                        }
+                    })
+                    .xDim(xDim2)
+                    .yDim(yDim2)
+                    .popupColumns(['DisplayName', 'PointType', 'FlowDirection', 'flow_value', 'Region', 'County', 'DisplayName'])
+
+                /*----------------BUILD THE LINEMAP---------------------
+                  The Linemap is rendered using the omnisci_geo(LINESTRING) column from the 
+                  US Natural Gas Pipeline table, and the lines are colored based on the TYPEPIPE
+                  column. Also, specify some items of interest as popup values.
+                 */
+
+                // map bounding box filtering dimension
+                const viewBoxDim = linecfLayer2.dimension(config.geoMeasure)
+                const linecolorRange = [
+                    "rgba(234,174,239,1)",
+                    "rgba(189,174,239,1)",
+                    "rgba(179,174,239,1)",
+                    "rgba(39,174,239,1)"
+                ]
+                const linecolorDomain = [
+                    "Interstate",
+                    "Intrastate",
+                    "Gathering",
+                    "Other"
+                ]
+
+                const bounds = {
+                    lonMin: -124.70126,
+                    lonMax: -66.82674,
+                    latMin: 27.937431,
+                    latMax: 49.467835
+                }
+
+                // crossfilter method to count number of lines within the map bounding box
+                viewBoxDim.filterST_Min_ST_Max(bounds)
+
+                const lineLayer = dc.rasterLayer("lines")
+                    .crossfilter(linecfLayer2)
+                    .setState({
+                        data: [{
+                            table: config.table,
+                            attr: "rowid"
+                        }],
+                        transform: {
+                            sample: true,
+                            limit: 100000,
+                            tableSize: 33589
+                        },
+                        mark: {
+                            type: "lines",
+                            lineJoin: "bevel"
+                        },
+                        encoding: {
+                            size: "auto",
+                            size: {
+                                type: "quantitative",
+                                field: "Shape_Leng",
+                                domain: [0, 1000],
+                                range: [2, 7]
+                            },
+                            color: {
+                                type: "ordinal",
+                                field: config.colorMeasure,
+                                colorMeasureAggType: "# Unique",
+                                domain: linecolorDomain,
+                                range: linecolorRange,
+                                legend: {
+                                    title: config.colorMeasure + ' [' + config.table + ']',
+                                    open: true
+                                }
+                            },
+                            geocol: config.geoMeasure,
+                            geoTable: config.table
+                        }
+                    })
+                    .viewBoxDim(viewBoxDim)
+                    .popupColumns(["rowid", "TYPEPIPE"])
+                    .popupColumnsMapped({})
+
+                /*---------------------TIME CHART EXAMPLE----------------------------------
+                   We create the time chart with the flow_date on the x-axis and 
+                   the SUM of flow_value on the y-axis. 
+                 */
+
+                /*
+                 *  First we want to determine the extent (min,max) of the time variable so we
+                 *  can set the bounds on the time chart appropriately.
+                 *
+                 *  If you know the bounds a priori you can do this manually but here we will
+                 *  do it dymaically via a query sent to the backend through the crossfilter
+                 *  api.
+                 *
+                 *  We create a reduceMulti expression that will get the min and max of the
+                 *  variable flow_date.
+                 *
+                 */
+
+                var timeChartMeasures = [{
+                    expression: "flow_date",
+                    agg_mode: "min",
+                    name: "minimum"
+                }, {
+                    expression: "flow_date",
+                    agg_mode: "max",
+                    name: "maximum"
+                }]
+
+                /* Note then when we are doing aggregations over the entire dataset we use
+                 * the crossfilter object itself as the dimension with the groupAll method
+                 *
+                 * values(true) gets the values for our groupAll measure (here min and max
+                 * of dep_timestamp) - true means to ignore currently set filters - i.e.
+                 * get a global min and max
+                 */
+                pointcfLayer1
+                    .groupAll()
+                    .reduce(timeChartMeasures)
+                    .valuesAsync(true).then(function(timeChartBounds) {
+
+                        var timeChartDimension = pointcfLayer1.dimension("flow_date");
+
+                        /* We would like to bin or histogram the time values.  We do this by
+                         * invoking setBinParams on the group.  Here we are asking for 400 equal
+                         * sized bins from the min to the max of the time range
+                         */
+                        var timeChartGroup = timeChartDimension
+                            .group()
+                            .reduceSum('flow_value')
+
+                        /*  We create the time chart as a line chart
+                         *  with the following parameters:
+                         *
+                         *  Width and height - as above
+                         *
+                         *  elasticY(true) - cause the y-axis to scale as filters are changed
+                         *
+                         *  renderHorizontalGridLines(true) - add grid lines to the chart
+                         *
+                         *  brushOn(true) - Request a filter brush to be added to the chart - this
+                         *  will allow users to drag a filter window along the time chart and filter
+                         *  the rest of the data accordingly
+                         *
+                         */
+
+                        var dcTimeChart = dc.lineChart('.time-chart')
+                            .width(w / 2)
+                            .height(h / 2.5)
+                            .elasticY(true)
+                            .renderHorizontalGridLines(true)
+                            .brushOn(true)
+                            .xAxisLabel('Flow Date')
+                            .yAxisLabel('Flow Value')
+                            .dimension(timeChartDimension)
+                            .group(timeChartGroup)
+                            .binParams({
+                                numBins: 400,
+                                binBounds: [timeChartBounds.minimum, timeChartBounds.maximum]
+                            });
+
+                        /* Set the x and y axis formatting with standard d3 functions */
+
+                        dcTimeChart
+                            .x(d3.time.scale.utc().domain([timeChartBounds.minimum, timeChartBounds.maximum]))
+                            .yAxis().ticks(5);
+
+                        dcTimeChart
+                            .xAxis()
+                            .scale(dcTimeChart.x())
+                            .tickFormat(dc.utils.customTimeFormat)
+                            .orient('top');
+                    });
+
+                /*---------------------BAR CHART EXAMPLE----------------------------------
+                   The bar chart is created using the Region column and the width of the bar 
+                   represents the SUM of the flow_value. 
+                 */
+
+                var colorScheme = ["#27aeef", "#ea5545", "#87bc45", "#b33dc6", "#f46a9b", "#ede15b", "#bdcf32", "#ef9b20", "#4db6ac", "#edbf33", "#7c4dff"]
+                var rowChartDimension = pointcfLayer1.dimension("Region");
+                var rowChartGroup = rowChartDimension.group().reduceSum("flow_value");
+                var dcBarChart = dc.rowChart('.bar-chart')
+                    .width(w / 2)
+                    .height(h / 2.5)
+                    .elasticX(true)
+                    .cap(20)
+                    .othersGrouper(false)
+                    .ordinalColors(colorScheme)
+                    .measureLabelsOn(true)
+                    .dimension(rowChartDimension)
+                    .group(rowChartGroup)
+                    .autoScroll(true);
+
+                // Grab the parent div.
+                var parent = document.getElementById("gas-production-example");
+
+                var pointMapChart = dc.rasterChart(parent, true) // create a raster chart. true indicates a pointmap
+                    .con(con) // indicate the connection layer
+                    .usePixelRatio(true) // tells the widget to use the pixel ratio of the
+                    // screen for proper sizing of the backend-rendered image
+                    .useLonLat(true) // all point layers need their x,y coordinates, which
+                    // are lon,lat converted to mercator.
+                    .height(h / 1.27) // set width/height
+                    .width(w)
+                    .mapUpdateInterval(750)
+                    .mapStyle('mapbox://styles/mapbox/light-v8')
+                    .mapboxToken(mapboxToken) // need a mapbox accessToken for loading the tiles
+
+                // add the pointmap and linemap layers
+                .pushLayer('pointtable1', pointLayer1)
+                    .pushLayer('pointtable2', lineLayer)
+
+                // and setup a buffer radius around the pixels for hit-testing
+                // This radius helps to properly resolve hit-testing at boundaries
+                .popupSearchRadius(2)
+                    .useGeoTypes(true)
+
+                pointMapChart.init().then(function() {
+                    // now render the pointmap
+                    dc.renderAllAsync()
+
+                    /*---------------SETUP HIT-TESTING-------------*/
+                    // hover effect with popup
+                    // Use a flag to determine if the map is in motion
+                    // or not (pan/zoom/etc)
+                    var mapmove = false;
+
+                    // debounce the popup - we only want to show the popup when the
+                    // cursor is idle for a portion of a second.
+                    var debouncedPopup = _.debounce(displayPopupWithData, 250)
+                    pointMapChart.map().on('movestart', function() {
+                        // map has started moving in some way, so cancel
+                        // any debouncing, and hide any current popups.
+                        mapmove = true;
+                        debouncedPopup.cancel();
+                        pointMapChart.hidePopup();
+                    });
+
+                    pointMapChart.map().on('moveend', function(event) {
+                        // map has stopped moving, so start a debounce event.
+                        // If the cursor is idle, a popup will show if the
+                        // cursor is over a layer element.
+                        mapmove = false;
+                        debouncedPopup(event);
+                        pointMapChart.hidePopup();
+                    });
+
+                    pointMapChart.map().on('mousemove', function(event) {
+                        // mouse has started moving, so hide any existing
+                        // popups. 'true' in the following call says to
+                        // animate the hiding of the popup
+                        pointMapChart.hidePopup(true);
+
+                        // start a debound popup event if the map isn't
+                        // in motion
+                        if (!mapmove) {
+                            debouncedPopup(event);
+                        }
+                    })
+
+                    // callback function for when the mouse has been idle for a moment.
+                    function displayPopupWithData(event) {
+                        if (event.point) {
+                            // check the pointmap for hit-testing. If a layer's element is found under
+                            // the cursor, then display a popup of the resulting columns
+                            pointMapChart.getClosestResult(event.point, function(closestPointResult) {
+                                // 'true' indicates to animate the popup when starting to display
+                                pointMapChart.displayPopup(closestPointResult, true)
+                            });
+                        }
+                    }
+
+                    /*--------------------------RESIZE EVENT------------------------------*/
+                       Here we listen to any resizes of the main window.  On resize 
+                       we resize the corresponding widgets and call dc.renderAll() 
+                       to refresh everything.
+                     */
+
+                    window.addEventListener("resize", _.debounce(reSizeAll, 500));
+
+                    function reSizeAll() {
+                        var w = document.documentElement.clientWidth - 30;
+                        var h = Math.max(document.documentElement.clientHeight, window.innerHeight || 0) - 150;
+
+                        pointMapChart
+                            .width(w)
+                            .height(h / 1.25);
+
+                        dcBarChart
+                            .width(w / 2)
+                            .height(h / 2.5);
+
+                        dcTimeChart
+                            .width(w / 2)
+                            .height(h / 2.5);
+
+                        dc.redrawAllAsync();
+                    }
+                })
+            }
+
+        });
+    </script>
+</body>
+
+</html>
