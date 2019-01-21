@@ -85,13 +85,13 @@
          * This is an example code that shows how to make a multi-layered pointmap & linemap
          * alongwith a bar chart and time chart using the Natural Gas production and US Pipeline
          * datasets.
-             vs_gas_production_us_2018 - Table with US Natural Gas production information
-             vs_NaturalGas_Pipelines_US_201804 - US Natural Gas Pipeline information
+             gas_production_us_2018 - Table with US Natural Gas production information
+             NaturalGas_Pipelines_US_201804 - US Natural Gas Pipeline information
          */
 
         document.addEventListener("DOMContentLoaded", function init() {
             const config = {
-                table: "vs_NaturalGas_Pipelines_US_201804",
+                table: "NaturalGas_Pipelines_US_201804",
                 geoMeasure: "omnisci_geo",
                 colorMeasure: "TYPEPIPE"
             }
@@ -102,13 +102,13 @@
                 .host("use2-api.mapd.cloud") // Connect to OmniSci Cloud Host
                 .port("443")
                 .dbName("mapd") // Default database
-                .user("F0A7674FB728C4DE89A0") // Enter from SETTINGS on cloud portal
-                .password("fiNNiSG6YFZYac7Y9qLROCbbFRSif7L12BWfErSn")
+                .user("F0A7xxxx")   // Enter from SETTINGS on cloud portal
+                .password("fiNxxx") // Enter from SETTINGS on cloud portal
                 .connect(function(error, con) {
                     // Table for the first layer which is a pointmap.
-                    var tableName1 = 'vs_gas_production_us_2018';
+                    var tableName1 = 'gas_production_us_2018';
                     // Table for the second layer which is a linemap.
-                    var tableName2 = 'vs_NaturalGas_Pipelines_US_201804';
+                    var tableName2 = 'NaturalGas_Pipelines_US_201804';
                     // Make 2 crossfilters for the 2 layers.
                     // A CrossFilter instance is used for generating the raw query strings for MapdCon.
                     // First Layer
