@@ -1,55 +1,26 @@
 # Sample apps based on mapd-charting
 
-# Get the mapd-charting source code:
-git clone https://github.com/omnisci/mapd-charting.git
+#### Get the mapd-charting source code:
+```git clone https://github.com/omnisci/mapd-charting.git
+```
 
-# Install Dependencies:
-cd mapd-charting
-yarn install 
+#### Install Dependencies:
+```cd mapd-charting
+yarn install
+```
 
-# Test sample code
+#### Test sample code
 The sample code creates a multi-layered pointmap/linemap with time and bar chart using US natural gas and pipeline information. These tables are referred to as 
 gas_production_us_2018 - Table with US Natural Gas production information
 NaturalGas_Pipelines_US_201804 - US Natural Gas Pipeline information
 Once you have the tables setup in your OmniSci cloud or on-premise instance, change the user/password fields in MapdCon().
 You can then either modify index.html to call i2enabled_natgas_pipelines.html or simply copy i2enabled_natgas_pipelines.html over index.html. Start the server by typing:
-yarn run start
+```yarn run start
+```
 
 Open browser to http://localhost:8080.
 Dimensional charting built to work natively with crossfilter rendered using d3.js.
 
-# Screenshots
-
-#### Flights Dataset: Brushing on timeline with Bubble Chart and Row Chart
-
-![example1](https://cloud.githubusercontent.com/assets/2932405/25641647/1acce1f2-2f4a-11e7-87d4-a4e80cb262f5.gif)
-
-#### Tweets Dataset: Brushing on timeline and hovering on Pointmap datapoint which displays row information
-
-![example2](https://user-images.githubusercontent.com/4845281/28191946-21bb7ec0-67e8-11e7-855e-8922939d1241.gif)
-
-#### Tweets Dataset: Using MapD-Draw tool on pointmap to select specific areas on a map
-
-![example5](https://user-images.githubusercontent.com/4845281/28191947-21bd2ad6-67e8-11e7-9c8d-a5ddcd0f07fc.gif)
-
-# Examples
-
-Visit our [examples page](https://omnisci.github.io/mapd-charting/example/) for ideas of what can be created MapD Charting
-
-# Quick Start
-
-##### Step 1: Install Dependencies
-
-```bash
-yarn install #downloads all dependencies and devDependencies
-```
-
-##### Step 2: Run Start Script
-```bash
-yarn run start
-or
-yarn run watch
-```
 
 # Synopsis
 
