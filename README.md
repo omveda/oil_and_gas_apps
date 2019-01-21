@@ -1,5 +1,21 @@
-# MapD Charting
+# Sample apps based on mapd-charting
 
+# Get the mapd-charting source code:
+git clone https://github.com/omnisci/mapd-charting.git
+
+# Install Dependencies:
+cd mapd-charting
+yarn install 
+
+# Test sample code
+The sample code creates a multi-layered pointmap/linemap with time and bar chart using US natural gas and pipeline information. These tables are referred to as 
+gas_production_us_2018 - Table with US Natural Gas production information
+NaturalGas_Pipelines_US_201804 - US Natural Gas Pipeline information
+Once you have the tables setup in your OmniSci cloud or on-premise instance, change the user/password fields in MapdCon().
+You can then either modify index.html to call i2enabled_natgas_pipelines.html or simply copy i2enabled_natgas_pipelines.html over index.html. Start the server by typing:
+yarn run start
+
+Open browser to http://localhost:8080.
 Dimensional charting built to work natively with crossfilter rendered using d3.js.
 
 # Screenshots
